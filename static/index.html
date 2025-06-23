@@ -167,8 +167,12 @@
     }
   }
 </style>
-<script type="module" src="/static/streaming.js"></script>
-<script type="module" src="/static/chat-init.js"></script>
+<!-- Import styles module -->
+<script type="module">
+  import { applyStyles } from './styles.js';
+  // Apply styles immediately
+  applyStyles();
+</script>
 
 <body>
   <div id="ai-search-container">
@@ -198,7 +202,8 @@
   </div>
 
   <script type="module">
-    import { ChatInterface } from '/static/streaming.js';
+    // Import the ChatInterface from the correct module
+    import { ChatInterface } from './chat-interface.js';
     
     // Single global chat interface
     let chat_interface = null;
