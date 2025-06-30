@@ -67,12 +67,43 @@
             max-height: 500px;
             display: none;
             z-index: 1000;
-            overflow: hidden;
+            overflow: visible;
             flex-direction: column;
         }
         
         .dropdown-results.show {
             display: flex;
+        }
+        
+        /* Conversations panel - slides out to the left */
+        .dropdown-conversations-panel {
+            position: absolute;
+            left: -5px;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px 0 0 8px;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+        
+        .dropdown-conversations-panel.show {
+            width: 250px;
+            left: -250px;
+        }
+        
+        .dropdown-conversations-list {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            width: 250px;
+        }
+        
+        .dropdown-conversations-panel.show .dropdown-conversations-list {
+            opacity: 1;
         }
         
         /* Hide elements we don't need */
@@ -86,6 +117,10 @@
             flex: 1;
             overflow-y: auto;
             min-height: 0;
+            max-height: 500px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
         }
         
         /* Override message styles for dropdown display */
@@ -144,8 +179,6 @@
         /* Conversations list in dropdown */
         .dropdown-conversations-list {
             padding: 8px;
-            max-height: 400px;
-            overflow-y: auto;
         }
         
         /* Chat input in dropdown */
@@ -224,8 +257,10 @@
         </div>
         
         <div id="dropdown-results" class="dropdown-results">
-            <div id="dropdown-conversations-list" class="dropdown-conversations-list" style="display: none;">
-                <!-- Conversations will be loaded here -->
+            <div id="dropdown-conversations-panel" class="dropdown-conversations-panel">
+                <div id="dropdown-conversations-list" class="dropdown-conversations-list">
+                    <!-- Conversations will be loaded here -->
+                </div>
             </div>
             <div id="messages-container">
                 <button class="close-dropdown" onclick="closeDropdown()">&times;</button>
@@ -277,12 +312,25 @@
                 this.dropdownResults = document.getElementById('dropdown-results');
                 this.messagesContainer = document.getElementById('messages-container');
                 this.dropdownConversationsList = document.getElementById('dropdown-conversations-list');
+                this.dropdownConversationsPanel = document.getElementById('dropdown-conversations-panel');
                 this.chatInterface = null;
                 this.site = site;
-                this.showingHistory = false;
                 
                 // History icon
                 this.historyIcon = document.getElementById('history-icon');
+                
+                // History icon event handler - attach immediately
+                if (this.historyIcon) {
+                    console.log('History icon found, attaching click handler');
+                    this.historyIcon.addEventListener('click', (e) => {
+                        console.log('History icon clicked!');
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.toggleConversationsPanel();
+                    });
+                } else {
+                    console.error('History icon not found!');
+                }
                 
                 this.init();
             }
@@ -314,7 +362,6 @@
                     this.chatInterface.sendMessage = (message) => {
                         // Show dropdown when sending message
                         this.showDropdown();
-                        this.showSearchResults();
                         
                         // Call original method
                         originalSendMessage(message);
@@ -324,6 +371,9 @@
                         if (chatInputContainer) {
                             chatInputContainer.style.display = 'block';
                         }
+                        
+                        // Update conversations list after sending message
+                        this.updateConversationsList();
                     };
                     
                     // Override addMessage to ensure site is saved with conversations
@@ -367,42 +417,27 @@
                             this.closeDropdown();
                         }
                     });
-                    
-                    // History icon event handler
-                    this.historyIcon.addEventListener('click', () => {
-                        this.showDropdown();
-                        this.toggleHistory();
-                    });
                 }, 100);
             }
             
-            toggleHistory() {
-                this.showingHistory = !this.showingHistory;
+            toggleConversationsPanel() {
+                console.log('toggleConversationsPanel called');
+                console.log('Dropdown visible:', this.dropdownResults.classList.contains('show'));
+                console.log('Panel element:', this.dropdownConversationsPanel);
                 
-                if (this.showingHistory) {
-                    this.messagesContainer.style.display = 'none';
-                    this.dropdownConversationsList.style.display = 'block';
-                    // Hide chat input in history mode
-                    const chatInputContainer = document.querySelector('.chat-input-container');
-                    if (chatInputContainer) {
-                        chatInputContainer.style.display = 'none';
-                    }
-                    this.updateConversationsList();
-                } else {
-                    this.showSearchResults();
+                if (!this.dropdownResults.classList.contains('show')) {
+                    console.log('Dropdown not visible, showing it first');
+                    this.showDropdown();
                 }
-            }
-            
-            showSearchResults() {
-                this.showingHistory = false;
-                this.messagesContainer.style.display = 'block';
-                this.dropdownConversationsList.style.display = 'none';
-                // Show chat input if there are messages (excluding the close button)
-                if (this.messagesContainer && this.messagesContainer.children.length > 1) {
-                    const chatInputContainer = document.querySelector('.chat-input-container');
-                    if (chatInputContainer) {
-                        chatInputContainer.style.display = 'block';
-                    }
+                
+                // Toggle the conversations panel
+                this.dropdownConversationsPanel.classList.toggle('show');
+                console.log('Panel show state after toggle:', this.dropdownConversationsPanel.classList.contains('show'));
+                
+                // Update conversations list when showing
+                if (this.dropdownConversationsPanel.classList.contains('show')) {
+                    console.log('Updating conversations list');
+                    this.updateConversationsList();
                 }
             }
             
@@ -436,8 +471,7 @@
                         const conversation = this.chatInterface.conversations.find(c => c.title === title);
                         
                         if (conversation) {
-                            // Switch to search results and load the conversation
-                            this.showSearchResults();
+                            // Load the conversation
                             this.chatInterface.loadConversation(conversation.id);
                             
                             // Update search input with the first user message
@@ -458,8 +492,8 @@
             closeDropdown() {
                 this.dropdownResults.classList.remove('show');
                 
-                // Reset to search mode
-                this.showingHistory = false;
+                // Hide conversations panel
+                this.dropdownConversationsPanel.classList.remove('show');
                 
                 // Hide chat input container
                 const chatInputContainer = document.querySelector('.chat-input-container');
