@@ -236,29 +236,12 @@ class NLWebHandler:
                     else:
                         logger.warning("No headers found in CONFIG.nlweb.headers")
                     
-                    # Send API keys from config as messages
+                    # API keys are server-side credentials and must NEVER be sent to clients.
+                    # They are logged for operational visibility only.
                     if hasattr(CONFIG.nlweb, 'api_keys') and CONFIG.nlweb.api_keys:
-                        logger.info(f"API keys in config: {list(CONFIG.nlweb.api_keys.keys())}")
-                        for key_name, key_value in CONFIG.nlweb.api_keys.items():
-                            logger.info(f"Processing API key '{key_name}': value exists = {bool(key_value)}")
-                            if key_value:  # Only send if key has a value
-                                api_key_message = {
-                                    "message_type": "api_key",
-                                    "key_name": key_name,
-                                    "key_value": key_value,
-                                    "query_id": self.query_id
-                                }
-                                try:
-                                    await self.http_handler.write_stream(api_key_message)
-                                    logger.info(f"Sent API key configuration for: {key_name} (length: {len(key_value)})")
-                                except Exception as e:
-                                    logger.error(f"Error sending API key {key_name}: {e}")
-                                    self.connection_alive_event.clear()
-                                    return
-                            else:
-                                logger.warning(f"API key '{key_name}' has no value, skipping")
-                    else:
-                        logger.info("No API keys configured in CONFIG.nlweb")
+                        configured_keys = [name for name, val in CONFIG.nlweb.api_keys.items() if val]
+                        if configured_keys:
+                            logger.info(f"Server has API keys configured (names only): {configured_keys}")
                 
                 try:
                     await self.http_handler.write_stream(message)
