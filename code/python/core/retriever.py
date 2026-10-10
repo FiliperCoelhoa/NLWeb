@@ -86,15 +86,27 @@ _installed_packages = set()
 
 def _ensure_package_installed(db_type: str):
     """
-    Ensure the required packages for a database type are installed.
+    Verify the required packages for a database type are installed.
+    
+    IMPORTANT: This function no longer auto-installs packages at runtime.
+    Dependencies must be pre-installed via requirements.txt or setup.py
+    before starting the server. Auto-installing at runtime is unsafe because:
+    - It requires shell execution with user-level privileges
+    - It can fail silently or hang the server startup
+    - It bypasses any supply-chain security policies
     
     Args:
         db_type: The type of database backend
+        
+    Raises:
+        ImportError: If a required package is not installed
     """
     if db_type not in _db_type_packages:
         return
     
     packages = _db_type_packages[db_type]
+    missing_packages = []
+    
     for package in packages:
         # Extract package name without version for caching
         package_name = package.split(">=")[0].split("==")[0].split("[")[0]
@@ -119,17 +131,15 @@ def _ensure_package_installed(db_type: str):
             _installed_packages.add(package_name)
             logger.debug(f"Package {package_name} is already installed")
         except ImportError:
-            # Package not installed, install it
-            logger.info(f"Installing {package} for {db_type} backend...")
-            try:
-                subprocess.check_call([
-                    sys.executable, "-m", "pip", "install", package, "--quiet"
-                ])
-                _installed_packages.add(package_name)
-                logger.info(f"Successfully installed {package}")
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Failed to install {package}: {e}")
-                raise ValueError(f"Failed to install required package {package} for {db_type}")
+            missing_packages.append(package)
+            logger.warning(f"Package '{package}' is not installed for {db_type} backend")
+    
+    if missing_packages:
+        install_cmd = f"pip install {' '.join(missing_packages)}"
+        raise ImportError(
+            f"Missing required packages for '{db_type}' backend: {', '.join(missing_packages)}. "
+            f"Please install them before starting the server:\n    {install_cmd}"
+        )
 
 
 class VectorDBClientInterface(ABC):
