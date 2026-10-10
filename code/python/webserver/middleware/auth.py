@@ -2,6 +2,7 @@
 
 from aiohttp import web
 import logging
+import base64
 from typing import Optional, Set
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,52 @@ PUBLIC_ENDPOINTS: Set[str] = {
     # Allow public access to ask endpoint for now (can be changed)
     '/ask'
 }
+
+# Minimum token length (JWT tokens are typically 100+ chars)
+MIN_TOKEN_LENGTH = 16
+
+
+def _validate_token_format(token: str) -> bool:
+    """
+    Perform basic token format validation.
+    
+    This catches obviously invalid tokens (empty, too short, whitespace-only)
+    and optionally performs JWT structure validation for tokens that look like JWTs.
+    
+    Args:
+        token: The authentication token to validate
+        
+    Returns:
+        True if the token passes basic format checks
+    """
+    if not token or not token.strip():
+        return False
+    
+    token = token.strip()
+    
+    if len(token) < MIN_TOKEN_LENGTH:
+        logger.warning(f"Token too short ({len(token)} chars), minimum is {MIN_TOKEN_LENGTH}")
+        return False
+    
+    # Check if it looks like a JWT (three base64url-encoded parts separated by dots)
+    parts = token.split('.')
+    if len(parts) == 3:
+        try:
+            # Validate header and payload are valid base64url
+            for part in parts[:2]:  # Only validate first two parts (header, payload)
+                # Add padding back for base64 decoding
+                padding = 4 - len(part) % 4
+                if padding != 4:
+                    part += '=' * padding
+                base64.urlsafe_b64decode(part)
+            return True
+        except Exception:
+            # Not a valid JWT structure, but might still be another token type
+            logger.debug("Token does not appear to be a valid JWT, allowing as opaque token")
+            return True
+    
+    # Non-JWT tokens: just pass the length check
+    return True
 
 
 @web.middleware
@@ -77,8 +124,18 @@ async def auth_middleware(request: web.Request, handler):
             headers={'WWW-Authenticate': 'Bearer'}
         )
     
-    # TODO: Validate token with OAuth provider or JWT validation
-    # For now, we'll just store the token in the request
+    # Validate token format before accepting it
+    if not _validate_token_format(auth_token):
+        logger.warning(f"Invalid auth token format for protected endpoint: {path}")
+        return web.json_response(
+            {'error': 'Invalid authentication token', 'type': 'invalid_token'},
+            status=401,
+            headers={'WWW-Authenticate': 'Bearer'}
+        )
+    
+    # SECURITY WARNING: Token is accepted but NOT cryptographically verified.
+    # In production, this should validate JWT signatures or call OAuth provider.
+    # See: https://github.com/Jondhilipsiva/NLWeb/issues for planned token validation.
     request['auth_token'] = auth_token
     request['user'] = {
         'id': 'authenticated_user',
