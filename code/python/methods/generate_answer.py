@@ -96,12 +96,17 @@ class GenerateAnswer(NLWebHandler):
             logger.debug(f"Sending ranking request to LLM for item: {name}")
             ranking = await ask_llm(prompt, ans_struc, level="low", query_params=self.query_params)
             logger.debug(f"Received ranking score: {ranking.get('score', 'N/A')} for item: {name}")
+            try:
+                schema_object = json.loads(json_str) if json_str and isinstance(json_str, str) else (json_str if isinstance(json_str, dict) else {})
+            except (json.JSONDecodeError, TypeError):
+                schema_object = {}
+                logger.warning(f"Failed to parse JSON for item {name}, using empty dict")
             ansr = {
                 'url': url,
                 'site': site,
                 'name': name,
                 'ranking': ranking,
-                'schema_object': json.loads(json_str),
+                'schema_object': schema_object,
                 'sent': False,
             }
             
@@ -211,12 +216,17 @@ class GenerateAnswer(NLWebHandler):
                             
                         url, name, site, description, json_str = result
                         logger.debug(f"Adding result for {name} to final message")
+                        try:
+                            schema_obj = json.loads(json_str) if json_str and isinstance(json_str, str) else (json_str if isinstance(json_str, dict) else {})
+                        except (json.JSONDecodeError, TypeError):
+                            schema_obj = {}
+                            logger.warning(f"Failed to parse JSON for item {name} in synthesizeAnswer")
                         json_results.append({
                             "url": url,
                             "name": name,
                             "description": description,
                             "site": site,
-                            "schema_object": json.loads(json_str),
+                            "schema_object": schema_obj,
                         })
                         
                     # Update message with descriptions
