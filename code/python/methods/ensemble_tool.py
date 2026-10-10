@@ -60,7 +60,8 @@ class EnsembleToolHandler:
                 if not item_dict:
                     try:
                         item_dict = json.loads(json_str) if isinstance(json_str, str) else json_str
-                    except:
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.debug(f"JSON parse error in ensemble: {e}")
                         item_dict = {}
                 
                 try:
@@ -274,7 +275,7 @@ class EnsembleToolHandler:
                         url, json_str, name, site = result[0], result[1], result[2], result[3]
                         try:
                             schema_object = json.loads(json_str) if json_str else {}
-                        except:
+                        except (json.JSONDecodeError, TypeError):
                             schema_object = {}
                         
                         top_items.append({
@@ -324,7 +325,7 @@ class EnsembleToolHandler:
             # Parse JSON string to dict for processing
             try:
                 item_dict = json.loads(json_str) if isinstance(json_str, str) else json_str
-            except:
+            except (json.JSONDecodeError, TypeError):
                 item_dict = {}
             
             item_id = self._get_item_identifier(item_dict)
@@ -432,7 +433,7 @@ class EnsembleToolHandler:
             # Parse JSON to get item details
             try:
                 item_dict = json.loads(json_str) if isinstance(json_str, str) else json_str
-            except:
+            except (json.JSONDecodeError, TypeError):
                 item_dict = {}
             
             # Ensure item_dict is a dictionary, not a list
@@ -521,7 +522,7 @@ class EnsembleToolHandler:
                 url, json_str, name, site = item['item']
                 try:
                     item_dict = json.loads(json_str) if isinstance(json_str, str) else json_str
-                except:
+                except (json.JSONDecodeError, TypeError):
                     item_dict = {}
                 
                 item_id = self._get_item_identifier(item_dict)
