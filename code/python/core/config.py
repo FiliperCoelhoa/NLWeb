@@ -518,6 +518,7 @@ class AppConfig:
                 "as a hyperlink using its URL."
             )
         }
+        return default_instructions.get(instruction_type, "")
     
     def get_headers(self) -> Dict[str, str]:
         """Get the configured headers to include in responses."""
